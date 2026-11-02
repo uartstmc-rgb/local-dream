@@ -12,6 +12,8 @@ import androidx.room.withTransaction
 import io.github.xororz.localdream.data.db.AppDatabase
 import io.github.xororz.localdream.data.db.HistoryEntity
 import io.github.xororz.localdream.ui.screens.GenerationParameters
+import io.github.xororz.localdream.ui.screens.TimeSample
+import io.github.xororz.localdream.ui.screens.parseGenerationSeconds
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -176,6 +178,19 @@ class HistoryManager(private val context: Context) {
     // Newest matches first, capped. Backs the result-page thumbnail strip.
     fun observeRecent(filter: HistoryFilter, limit: Int): Flow<List<HistoryItem>> = dao.query(filter.toRecentQuery(limit)).map { entities ->
         entities.map { HistoryItem.fromEntity(filesDir, it) }
+    }
+
+    fun observeTimeSamples(
+        modelId: String,
+        runOnCpu: Boolean,
+        useOpenCL: Boolean,
+        limit: Int = 10,
+    ): Flow<List<TimeSample>> = dao.observeForEstimate(modelId, runOnCpu, useOpenCL, limit).map { list ->
+        list.mapNotNull { e ->
+            parseGenerationSeconds(e.generationTime)?.let {
+                TimeSample(e.steps, e.width, e.height, e.cfg, it)
+            }
+        }
     }
 
     fun observeFavorite(id: Long): Flow<Boolean?> = dao.observeFavorite(id)
