@@ -255,6 +255,21 @@ const val DIT_SIZE_STEPS = DitResolution.SLIDER_STEPS
 fun snapDitSize(value: Float): Int = DitResolution.snap(value)
 
 /**
+ * SD1.5 CPU (MNN) models accept any width/height that is a multiple of 8, so
+ * width and height are independent sliders (e.g. 256x448). 64-px steps keep the
+ * slider usable. Raise CPU_MAX_SIZE for larger canvases (slower, more RAM).
+ */
+const val CPU_MIN_SIZE = 128
+const val CPU_MAX_SIZE = 768
+const val CPU_SIZE_STEP = 64
+
+/** Slider positions between CPU_MIN_SIZE and CPU_MAX_SIZE, exclusive of both. */
+const val CPU_SIZE_STEPS = (CPU_MAX_SIZE - CPU_MIN_SIZE) / CPU_SIZE_STEP - 1
+
+fun snapCpuSize(value: Float): Int =
+    ((value / CPU_SIZE_STEP).roundToInt() * CPU_SIZE_STEP).coerceIn(CPU_MIN_SIZE, CPU_MAX_SIZE)
+
+/**
  * GCD-reduces (width, height) into a "W:H" aspect-ratio string.
  * Used by reproduce/import paths to recover an aspect from a recorded result size.
  */

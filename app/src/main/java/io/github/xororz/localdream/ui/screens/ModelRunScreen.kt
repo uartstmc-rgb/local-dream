@@ -667,12 +667,18 @@ fun ModelRunScreen(
             saveAllFields()
         }
     }
-    val onSizeChange = remember {
+    // SD1.5 CPU: width and height are independent (e.g. 256x448).
+    val onCpuWidthChange = remember {
         { value: Float ->
-            val rounded = (value / 64).roundToInt() * 64
-            val newSize = rounded.coerceIn(128, 512)
-            currentWidth = newSize
-            currentHeight = newSize
+            currentWidth = snapCpuSize(value)
+            aspectRatio = inferAspectRatioString(currentWidth, currentHeight)
+            saveAllFields()
+        }
+    }
+    val onCpuHeightChange = remember {
+        { value: Float ->
+            currentHeight = snapCpuSize(value)
+            aspectRatio = inferAspectRatioString(currentWidth, currentHeight)
             saveAllFields()
         }
     }
@@ -2088,7 +2094,8 @@ fun ModelRunScreen(
                                     },
                                     onStepsChange = onStepsChange,
                                     onCfgChange = onCfgChange,
-                                    onSizeChange = onSizeChange,
+                                    onCpuWidthChange = onCpuWidthChange,
+                                    onCpuHeightChange = onCpuHeightChange,
                                     onCpuSelected = {
                                         useOpenCL = false
                                         saveAllFields()

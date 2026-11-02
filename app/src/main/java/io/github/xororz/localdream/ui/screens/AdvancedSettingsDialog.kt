@@ -77,7 +77,8 @@ internal fun AdvancedSettingsDialog(
     onSchedulerChange: (String) -> Unit,
     onStepsChange: (Float) -> Unit,
     onCfgChange: (Float) -> Unit,
-    onSizeChange: (Float) -> Unit,
+    onCpuWidthChange: (Float) -> Unit = {},
+    onCpuHeightChange: (Float) -> Unit = {},
     onCpuSelected: () -> Unit,
     onGpuSelected: () -> Unit,
     onBatchCountsChange: (Float) -> Unit,
@@ -360,7 +361,7 @@ internal fun AdvancedSettingsDialog(
                 // SDXL package, so it must not be offered a range it cannot use.
                 // The runtime picker below stays for both.
                 if (runOnCpu && !isSdxl) {
-                    Column {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             stringResource(
                                 R.string.image_size,
@@ -369,11 +370,30 @@ internal fun AdvancedSettingsDialog(
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        Text(
+                            stringResource(R.string.width),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Slider(
                             value = currentWidth.toFloat(),
-                            onValueChange = onSizeChange,
-                            valueRange = 128f..512f,
-                            steps = 5,
+                            onValueChange = onCpuWidthChange,
+                            valueRange = CPU_MIN_SIZE.toFloat()..CPU_MAX_SIZE.toFloat(),
+                            steps = CPU_SIZE_STEPS,
+                            enabled = !isRunning,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            stringResource(R.string.height),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Slider(
+                            value = currentHeight.toFloat(),
+                            onValueChange = onCpuHeightChange,
+                            valueRange = CPU_MIN_SIZE.toFloat()..CPU_MAX_SIZE.toFloat(),
+                            steps = CPU_SIZE_STEPS,
+                            enabled = !isRunning,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
