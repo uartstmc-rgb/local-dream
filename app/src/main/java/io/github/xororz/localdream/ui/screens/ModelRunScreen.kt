@@ -405,6 +405,10 @@ fun ModelRunScreen(
         }
     }
 
+    // SD1.5 CPU quick presets: "Low Quality" toggle + last chosen preset label.
+    var cpuLowQuality by remember { mutableStateOf(false) }
+    var cpuPresetLabel by remember { mutableStateOf<String?>(null) }
+
     var currentWidth by remember {
         mutableIntStateOf(
             defaultGenerationSize(
@@ -670,6 +674,7 @@ fun ModelRunScreen(
     // SD1.5 CPU: width and height are independent (e.g. 256x448).
     val onCpuWidthChange = remember {
         { value: Float ->
+            cpuPresetLabel = null
             currentWidth = snapCpuSize(value)
             aspectRatio = inferAspectRatioString(currentWidth, currentHeight)
             saveAllFields()
@@ -677,10 +682,29 @@ fun ModelRunScreen(
     }
     val onCpuHeightChange = remember {
         { value: Float ->
+            cpuPresetLabel = null
             currentHeight = snapCpuSize(value)
             aspectRatio = inferAspectRatioString(currentWidth, currentHeight)
             saveAllFields()
         }
+    }
+    fun applyCpuPreset(preset: CpuSizePreset, lowQuality: Boolean) {
+        cpuPresetLabel = preset.label
+        currentWidth = preset.width(lowQuality)
+        currentHeight = preset.height(lowQuality)
+        aspectRatio = inferAspectRatioString(currentWidth, currentHeight)
+        saveAllFields()
+    }
+    val onCpuPresetSelected = { preset: CpuSizePreset ->
+        applyCpuPreset(preset, cpuLowQuality)
+    }
+    val onCpuLowQualityChange = { enabled: Boolean ->
+        cpuLowQuality = enabled
+        // Re-apply the preset the user last picked; if they tuned the sliders
+        // by hand, leave their size alone and only affect future preset taps.
+        CPU_SIZE_PRESETS.firstOrNull { it.label == cpuPresetLabel }
+            ?.let { applyCpuPreset(it, enabled) }
+        Unit
     }
     // DiT models take the requested size directly, so width and height are two
     // plain controls; aspectRatio is kept in step for the img2img crop and for
@@ -2096,6 +2120,10 @@ fun ModelRunScreen(
                                     onCfgChange = onCfgChange,
                                     onCpuWidthChange = onCpuWidthChange,
                                     onCpuHeightChange = onCpuHeightChange,
+                                    cpuLowQuality = cpuLowQuality,
+                                    cpuPresetLabel = cpuPresetLabel,
+                                    onCpuLowQualityChange = onCpuLowQualityChange,
+                                    onCpuPresetSelected = onCpuPresetSelected,
                                     onCpuSelected = {
                                         useOpenCL = false
                                         saveAllFields()

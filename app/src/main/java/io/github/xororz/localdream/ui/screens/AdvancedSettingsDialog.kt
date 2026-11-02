@@ -3,6 +3,7 @@ package io.github.xororz.localdream.ui.screens
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -79,6 +81,10 @@ internal fun AdvancedSettingsDialog(
     onCfgChange: (Float) -> Unit,
     onCpuWidthChange: (Float) -> Unit = {},
     onCpuHeightChange: (Float) -> Unit = {},
+    cpuLowQuality: Boolean = false,
+    cpuPresetLabel: String? = null,
+    onCpuLowQualityChange: (Boolean) -> Unit = {},
+    onCpuPresetSelected: (CpuSizePreset) -> Unit = {},
     onCpuSelected: () -> Unit,
     onGpuSelected: () -> Unit,
     onBatchCountsChange: (Float) -> Unit,
@@ -370,6 +376,46 @@ internal fun AdvancedSettingsDialog(
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                "Low Quality",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Switch(
+                                checked = cpuLowQuality,
+                                onCheckedChange = onCpuLowQualityChange,
+                                enabled = !isRunning,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            CPU_SIZE_PRESETS.forEach { preset ->
+                                val selected = preset.label == cpuPresetLabel &&
+                                    currentWidth == preset.width(cpuLowQuality) &&
+                                    currentHeight == preset.height(cpuLowQuality)
+                                if (selected) {
+                                    FilledTonalButton(
+                                        onClick = { onCpuPresetSelected(preset) },
+                                        enabled = !isRunning,
+                                        contentPadding = PaddingValues(horizontal = 4.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text(preset.label) }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { onCpuPresetSelected(preset) },
+                                        enabled = !isRunning,
+                                        contentPadding = PaddingValues(horizontal = 4.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text(preset.label) }
+                                }
+                            }
+                        }
                         Text(
                             stringResource(R.string.width),
                             style = MaterialTheme.typography.bodySmall,

@@ -266,6 +266,29 @@ const val CPU_SIZE_STEP = 64
 /** Slider positions between CPU_MIN_SIZE and CPU_MAX_SIZE, exclusive of both. */
 const val CPU_SIZE_STEPS = (CPU_MAX_SIZE - CPU_MIN_SIZE) / CPU_SIZE_STEP - 1
 
+/**
+ * Quick size presets for SD1.5 CPU. Each entry is (label, lowW, lowH, midW, midH).
+ * "Low Quality" mode uses the low pair, otherwise the medium pair.
+ * All values are multiples of CPU_SIZE_STEP so the sliders stay in sync.
+ */
+data class CpuSizePreset(
+    val label: String,
+    val lowW: Int,
+    val lowH: Int,
+    val midW: Int,
+    val midH: Int,
+) {
+    fun width(lowQuality: Boolean) = if (lowQuality) lowW else midW
+    fun height(lowQuality: Boolean) = if (lowQuality) lowH else midH
+}
+
+val CPU_SIZE_PRESETS = listOf(
+    CpuSizePreset("1:1", 256, 256, 448, 448),
+    CpuSizePreset("4:7", 256, 320, 320, 448),
+    CpuSizePreset("9:16", 256, 512, 448, 640),
+    CpuSizePreset("16:9", 512, 256, 640, 448),
+)
+
 fun snapCpuSize(value: Float): Int =
     ((value / CPU_SIZE_STEP).roundToInt() * CPU_SIZE_STEP).coerceIn(CPU_MIN_SIZE, CPU_MAX_SIZE)
 
