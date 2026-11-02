@@ -63,6 +63,19 @@ interface HistoryDao {
     @Query("SELECT COUNT(*) FROM generation_history WHERE modelId = :modelId AND timestamp = :timestamp")
     suspend fun countByKey(modelId: String, timestamp: Long): Int
 
+    // Recent finished txt2img runs of one model/runtime, used for the time estimate.
+    @Query(
+        "SELECT * FROM generation_history WHERE modelId = :modelId AND mode = 'TXT2IMG' " +
+            "AND runOnCpu = :runOnCpu AND useOpenCL = :useOpenCL AND generationTime IS NOT NULL " +
+            "ORDER BY timestamp DESC LIMIT :limit",
+    )
+    fun observeForEstimate(
+        modelId: String,
+        runOnCpu: Boolean,
+        useOpenCL: Boolean,
+        limit: Int,
+    ): Flow<List<HistoryEntity>>
+
     @Query("SELECT DISTINCT modelId FROM generation_history ORDER BY modelId")
     fun observeKnownModelIds(): Flow<List<String>>
 
