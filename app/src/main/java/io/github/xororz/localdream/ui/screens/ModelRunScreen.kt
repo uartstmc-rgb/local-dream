@@ -409,6 +409,11 @@ fun ModelRunScreen(
     var cpuLowQuality by remember { mutableStateOf(false) }
     var cpuPresetLabel by remember { mutableStateOf<String?>(null) }
 
+    // Time estimate: past txt2img runs of this model on the same runtime.
+    val timeSamples by remember(modelId, model?.runOnCpu, useOpenCL) {
+        historyManager.observeTimeSamples(modelId, model?.runOnCpu ?: false, useOpenCL)
+    }.collectAsState(initial = emptyList())
+
     var currentWidth by remember {
         mutableIntStateOf(
             defaultGenerationSize(
@@ -2219,6 +2224,34 @@ fun ModelRunScreen(
                                 )
                             },
                         )
+
+                        if (!isRunning && selectedImageUri == null) {
+                            val estimate = estimateGenerationTime(
+                                timeSamples,
+                                steps.roundToInt(),
+                                currentWidth,
+                                currentHeight,
+                                cfg,
+                            )
+                            if (estimate != null) {
+                                val perImage = formatEstimateSeconds(estimate.seconds)
+                                val label = buildString {
+                                    append("Estimated time: ~")
+                                    append(perImage)
+                                    if (batchCounts > 1) {
+                                        append(" per image, ~")
+                                        append(formatEstimateSeconds(estimate.seconds * batchCounts))
+                                        append(" total")
+                                    }
+                                    if (estimate.roughCfg) append(" (rough: CFG differs from past runs)")
+                                }
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
 
                         Button(
                             onClick = {
