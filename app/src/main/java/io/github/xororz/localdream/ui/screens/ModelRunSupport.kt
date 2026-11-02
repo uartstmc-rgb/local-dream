@@ -271,6 +271,9 @@ const val CPU_SIZE_STEPS = (CPU_MAX_SIZE - CPU_MIN_SIZE) / CPU_SIZE_STEP - 1
  * "Low Quality" mode uses the low pair, otherwise the medium pair.
  * All values are multiples of CPU_SIZE_STEP so the sliders stay in sync.
  */
+/** NPU "Chain" mode stops once the seed would pass this value. */
+const val CHAIN_MAX_SEED = 1_999_999_999L
+
 data class CpuSizePreset(
     val label: String,
     val lowW: Int,

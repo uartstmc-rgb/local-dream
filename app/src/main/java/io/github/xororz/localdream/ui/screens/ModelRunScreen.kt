@@ -409,6 +409,11 @@ fun ModelRunScreen(
     var cpuLowQuality by remember { mutableStateOf(false) }
     var cpuPresetLabel by remember { mutableStateOf<String?>(null) }
 
+    // NPU "Chain" mode: after each image finishes, seed + 1 and regenerate.
+    var chainEnabled by remember { mutableStateOf(false) }
+    var chainTick by remember { mutableIntStateOf(0) }
+    var chainCount by remember { mutableIntStateOf(0) }
+
     // Time estimate: past txt2img runs of this model on the same runtime.
     val timeSamples by remember(modelId, model?.runOnCpu, useOpenCL) {
         historyManager.observeTimeSamples(modelId, model?.runOnCpu ?: false, useOpenCL)
@@ -1378,6 +1383,7 @@ fun ModelRunScreen(
     // Stops the in-flight generation (single or batch) but keeps the backend
     // and the screen alive, so the user can immediately generate again.
     fun interruptGeneration() {
+        chainEnabled = false
         batchGenerationJob?.cancel()
         batchGenerationJob = null
         BackgroundGenerationService.stop(context)
@@ -2253,8 +2259,8 @@ fun ModelRunScreen(
                             }
                         }
 
-                        Button(
-                            onClick = {
+                        val startGeneration: () -> Unit = {
+                                errorMessage = null
                                 focusManager.clearFocus()
                                 pendingUltrafix = false
                                 Log.d(
@@ -2423,8 +2429,63 @@ fun ModelRunScreen(
                                         "ModelRunScreen",
                                         "all batches completed, isRunning set to false",
                                     )
+                                    if (chainEnabled && model?.runOnCpu == false) {
+                                        val last = returnedSeed
+                                        when {
+                                            last == null || errorMessage != null -> chainEnabled = false
+
+                                            last + 1 > CHAIN_MAX_SEED -> {
+                                                chainEnabled = false
+                                                Toast.makeText(
+                                                    context,
+                                                    "Chain finished: reached $CHAIN_MAX_SEED",
+                                                    Toast.LENGTH_LONG,
+                                                ).show()
+                                            }
+
+                                            else -> {
+                                                seed = (last + 1).toString()
+                                                chainCount++
+                                                chainTick++
+                                            }
+                                        }
+                                    }
                                 }
-                            },
+                        }
+
+                        // NPU only: auto-increment the seed and regenerate.
+                        LaunchedEffect(chainTick) {
+                            if (chainTick > 0 && chainEnabled) {
+                                delay(600)
+                                if (chainEnabled && !isRunning) startGeneration()
+                            }
+                        }
+                        if (model?.runOnCpu == false) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    if (chainEnabled && chainCount > 0) {
+                                        "Chain (seed +1): $chainCount done"
+                                    } else {
+                                        "Chain (seed +1, auto-regenerate)"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Switch(
+                                    checked = chainEnabled,
+                                    onCheckedChange = {
+                                        chainEnabled = it
+                                        if (it) chainCount = 0
+                                    },
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = startGeneration,
                             enabled = serviceState !is GenerationState.Progress &&
                                 !isRunning && !isUpscaling && !isUltrafixPreparing &&
                                 (selectedImageUri == null || base64EncodeDone),
