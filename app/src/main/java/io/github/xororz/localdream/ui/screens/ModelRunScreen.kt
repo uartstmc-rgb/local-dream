@@ -406,13 +406,38 @@ fun ModelRunScreen(
     }
 
     // SD1.5 CPU quick presets: "Low Quality" toggle + last chosen preset label.
-    var cpuLowQuality by remember { mutableStateOf(false) }
-    var cpuPresetLabel by remember { mutableStateOf<String?>(null) }
+    // The last choices (Low Quality, preset, Chain, Chain limit) are remembered
+    // and restored the next time the model is opened.
+    val uiPrefs = remember {
+        context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    }
+    var cpuLowQuality by remember {
+        mutableStateOf(uiPrefs.getBoolean("${modelId}_cpu_low_quality", false))
+    }
+    var cpuPresetLabel by remember {
+        mutableStateOf<String?>(uiPrefs.getString("${modelId}_cpu_preset_label", null))
+    }
 
     // NPU "Chain" mode: after each image finishes, seed + 1 and regenerate.
-    var chainEnabled by remember { mutableStateOf(false) }
+    var chainEnabled by remember {
+        mutableStateOf(uiPrefs.getBoolean("${modelId}_chain_enabled", false))
+    }
     var chainTick by remember { mutableIntStateOf(0) }
     var chainCount by remember { mutableIntStateOf(0) }
+    // 0 = no limit. Otherwise Chain stops after this many rounds.
+    var chainLimit by remember {
+        mutableIntStateOf(
+            uiPrefs.getInt("chain_limit", 0).takeIf { it in CHAIN_LIMIT_OPTIONS } ?: 0,
+        )
+    }
+    LaunchedEffect(cpuLowQuality, cpuPresetLabel, chainEnabled, chainLimit) {
+        uiPrefs.edit()
+            .putBoolean("${modelId}_cpu_low_quality", cpuLowQuality)
+            .putString("${modelId}_cpu_preset_label", cpuPresetLabel)
+            .putBoolean("${modelId}_chain_enabled", chainEnabled)
+            .putInt("chain_limit", chainLimit)
+            .apply()
+    }
 
     // Time estimate: past txt2img runs of this model on the same runtime.
     val timeSamples by remember(modelId, model?.runOnCpu, useOpenCL) {
@@ -2443,6 +2468,15 @@ fun ModelRunScreen(
                                                 ).show()
                                             }
 
+                                            chainLimit > 0 && chainCount + 1 >= chainLimit -> {
+                                                chainEnabled = false
+                                                Toast.makeText(
+                                                    context,
+                                                    "Chain finished: ${chainCount + 1} rounds done",
+                                                    Toast.LENGTH_LONG,
+                                                ).show()
+                                            }
+
                                             else -> {
                                                 seed = (last + 1).toString()
                                                 chainCount++
@@ -2481,6 +2515,65 @@ fun ModelRunScreen(
                                         if (it) chainCount = 0
                                     },
                                 )
+                            }
+                            if (chainEnabled) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        "Chain limit",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        TextButton(
+                                            onClick = {
+                                                val i = CHAIN_LIMIT_OPTIONS.indexOf(chainLimit)
+                                                chainLimit = CHAIN_LIMIT_OPTIONS[
+                                                    (i - 1).coerceAtLeast(0),
+                                                ]
+                                            },
+                                        ) { Text("-") }
+                                        Text(
+                                            if (chainLimit == 0) "No limit" else "$chainLimit",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        TextButton(
+                                            onClick = {
+                                                val i = CHAIN_LIMIT_OPTIONS.indexOf(chainLimit)
+                                                chainLimit = CHAIN_LIMIT_OPTIONS[
+                                                    (i + 1).coerceAtMost(
+                                                        CHAIN_LIMIT_OPTIONS.size - 1,
+                                                    ),
+                                                ]
+                                            },
+                                        ) { Text("+") }
+                                    }
+                                }
+                                if (!isRunning) {
+                                    val chainEst = estimateGenerationTime(
+                                        timeSamples,
+                                        steps.roundToInt(),
+                                        currentWidth,
+                                        currentHeight,
+                                        cfg,
+                                    )
+                                    if (chainEst != null) {
+                                        val perRound = chainEst.seconds * batchCounts
+                                        Text(
+                                            if (chainLimit > 0) {
+                                                "Chain total: $chainLimit rounds, ~" +
+                                                    formatEstimateSeconds(perRound * chainLimit)
+                                            } else {
+                                                "Chain: ~${formatEstimateSeconds(perRound)} per round, " +
+                                                    "runs until you stop it"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -2591,6 +2684,48 @@ fun ModelRunScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (chainEnabled && model?.runOnCpu == false) {
+                            val chainEst = estimateGenerationTime(
+                                timeSamples,
+                                steps.roundToInt(),
+                                currentWidth,
+                                currentHeight,
+                                cfg,
+                            )
+                            val round = chainCount + 1
+                            val roundText = if (chainLimit > 0) {
+                                "Chain: round $round of $chainLimit"
+                            } else {
+                                "Chain: round $round (no limit)"
+                            }
+                            val leftText = if (chainEst != null && chainLimit > 0) {
+                                val doneInRound = if (currentBatchIndex > 0) currentBatchIndex - 1 else 0
+                                val currentLeft = (
+                                    chainEst.seconds * ((batchCounts - doneInRound) - progress)
+                                    ).coerceAtLeast(0.0)
+                                val laterRounds = (chainLimit - round).coerceAtLeast(0)
+                                val left = currentLeft + chainEst.seconds * batchCounts * laterRounds
+                                " - about ${formatEstimateSeconds(left)} left"
+                            } else {
+                                ""
+                            }
+                            Text(
+                                roundText + leftText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                TextButton(onClick = { chainEnabled = false }) {
+                                    Text("Stop after this round")
+                                }
+                                TextButton(onClick = { interruptGeneration() }) {
+                                    Text("Stop now")
+                                }
+                            }
+                        }
                         intermediateBitmap?.let { bitmap ->
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(

@@ -274,6 +274,9 @@ const val CPU_SIZE_STEPS = (CPU_MAX_SIZE - CPU_MIN_SIZE) / CPU_SIZE_STEP - 1
 /** NPU "Chain" mode stops once the seed would pass this value. */
 const val CHAIN_MAX_SEED = 1_999_999_999L
 
+/** Choices for the Chain round limit; 0 means no limit. */
+val CHAIN_LIMIT_OPTIONS = listOf(0, 5, 10, 20, 50, 100)
+
 data class CpuSizePreset(
     val label: String,
     val lowW: Int,
